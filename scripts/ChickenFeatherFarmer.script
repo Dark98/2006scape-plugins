@@ -1,0 +1,359 @@
+// @name Chicken Feather Farmer
+// @author 2006Scape
+// @version 1.0.0
+// @minApi 1.0.0
+// @desc Automatically loots feathers, attacks chickens, and buries bones in chicken coops.
+// @type script
+// @config lootFeathers|Loot Feathers|bool|true
+// @config attackChickens|Attack Chickens|bool|true
+// @config buryBones|Bury Bones|bool|true
+// @config lootRawChicken|Loot Raw Chicken|bool|false
+// @config autoOpenGates|Open Gates|bool|true
+// @config showDebugOverlay|Debug Path Overlay|bool|false
+// @config maxRadius|Max Radius|int|15|5|30
+
+boolean lootFeathers = true;
+boolean attackChickens = true;
+boolean buryBones = true;
+boolean lootRawChicken = false;
+boolean autoOpenGates = true;
+boolean showDebugOverlay = false;
+int maxRadius = 15;
+
+int anchorX = -1;
+int anchorY = -1;
+int feathersLooted = 0;
+int bonesBuried = 0;
+int chickensAttacked = 0;
+int combatXpGained = 0;
+int prayerXpGained = 0;
+int lastInventoryFeatherCount = -1;
+
+int currentTargetNpcIndex = -1;
+long lastAttackTime = 0;
+Object recentDrop = null;
+long recentDropTime = 0;
+
+void onConfigChanged(key, value) {
+    if (key == "lootFeathers") {
+        lootFeathers = value;
+    } else if (key == "attackChickens") {
+        attackChickens = value;
+    } else if (key == "buryBones") {
+        buryBones = value;
+    } else if (key == "lootRawChicken") {
+        lootRawChicken = value;
+    } else if (key == "autoOpenGates") {
+        autoOpenGates = value;
+    } else if (key == "showDebugOverlay") {
+        showDebugOverlay = value;
+    } else if (key == "maxRadius") {
+        maxRadius = value.intValue();
+    }
+}
+
+void onStart(ctx) {
+    if (ctx != null && ctx.isLoggedIn()) {
+        anchorX = ctx.getPlayerX();
+        anchorY = ctx.getPlayerY();
+    }
+    feathersLooted = 0;
+    bonesBuried = 0;
+    chickensAttacked = 0;
+    combatXpGained = 0;
+    prayerXpGained = 0;
+    if (ctx != null) {
+        lastInventoryFeatherCount = ctx.getInventoryItemCount(ItemID.FEATHER);
+    } else {
+        lastInventoryFeatherCount = 0;
+    }
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    recentDrop = null;
+    recentDropTime = 0;
+    script.setStatus("Started");
+    if (ctx != null) {
+        ctx.sendClientMessage("Chicken Feather Farmer started! Anchor: (" + anchorX + ", " + anchorY + ")");
+    }
+}
+
+void onStop(ctx) {
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    if (ctx != null) {
+        ctx.sendClientMessage("Chicken Feather Farmer stopped. Feathers looted: " + feathersLooted);
+    }
+}
+
+void onPlayerDeath(ctx) {
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    script.setStatus("Died - resetting");
+    script.clearWait();
+}
+
+boolean isEngagedWithTarget(ctx) {
+    if (currentTargetNpcIndex == -1) {
+        return false;
+    }
+    Object target = ctx.getNpcByIndex(currentTargetNpcIndex);
+    if (target == null || target.isDead()) {
+        if (target != null && target.isDead()) {
+            chickensAttacked++;
+        } else if (lastAttackTime > 0 && (System.currentTimeMillis() - lastAttackTime) > 1200) {
+            chickensAttacked++;
+        }
+        currentTargetNpcIndex = -1;
+        lastAttackTime = 0;
+        return false;
+    }
+
+    if (target.getDistance() > (maxRadius + 5)) {
+        currentTargetNpcIndex = -1;
+        lastAttackTime = 0;
+        return false;
+    }
+
+    long elapsed = System.currentTimeMillis() - lastAttackTime;
+    if (target.isAttackingPlayer || ctx.getPlayerInteractingIndex() == currentTargetNpcIndex || elapsed < 4000) {
+        return true;
+    }
+
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    return false;
+}
+
+int loop(ctx) {
+    if (!ctx.isLoggedIn()) {
+        script.setStatus("Waiting for login");
+        return 1000;
+    }
+
+    if (ctx.canContinueDialogue()) {
+        script.setStatus("Continuing dialogue");
+        ctx.continueDialogue();
+        return ctx.randomDelay(600, 900);
+    }
+
+    ctx.ensureRunEnabled(25);
+
+    if (script.isStuck(20000)) {
+        script.setStatus("Watchdog: recovering");
+        script.clearWait();
+        currentTargetNpcIndex = -1;
+        script.resetWatchdog();
+    }
+
+    if (anchorX == -1 || anchorY == -1) {
+        anchorX = ctx.getPlayerX();
+        anchorY = ctx.getPlayerY();
+    }
+
+    int currentFeathers = ctx.getInventoryItemCount(ItemID.FEATHER);
+    if (lastInventoryFeatherCount != -1 && currentFeathers > lastInventoryFeatherCount) {
+        feathersLooted += (currentFeathers - lastInventoryFeatherCount);
+    }
+    lastInventoryFeatherCount = currentFeathers;
+
+    if (attackChickens && isEngagedWithTarget(ctx)) {
+        script.setStatus("Fighting chicken");
+        return ctx.randomDelay(550, 700);
+    }
+
+    if (lootFeathers && (!ctx.isInventoryFull() || ctx.hasInventoryItem(ItemID.FEATHER) || ctx.hasInventoryItem("Feather"))) {
+        Object underFoot = null;
+        if (recentDrop != null && (System.currentTimeMillis() - recentDropTime) < 5000) {
+            underFoot = recentDrop;
+            recentDrop = null;
+        } else {
+            underFoot = ctx.groundItems().within(1).id(ItemID.FEATHER).reachable().nearest();
+            if (underFoot == null) {
+                underFoot = ctx.groundItems().within(1).named("Feather").reachable().nearest();
+            }
+        }
+        if (underFoot != null && underFoot.getDistance() <= 1 && ctx.canReach(underFoot)) {
+            script.setStatus("Looting nearby feather (" + underFoot.amount + ")");
+            ctx.takeGroundItem(underFoot);
+            return ctx.randomDelay(900, 1200);
+        }
+    }
+
+    if (attackChickens) {
+        Object attacker = ctx.getNpcAttackingPlayer();
+        if (attacker != null && attacker.name.toLowerCase().contains("chicken") && !attacker.isDead()) {
+            currentTargetNpcIndex = attacker.index;
+            lastAttackTime = System.currentTimeMillis();
+            script.setStatus("Fighting chicken");
+            ctx.interactNpc(attacker, "Attack");
+            return ctx.randomDelay(900, 1150);
+        }
+    }
+
+    if (autoOpenGates && script.hasElapsed("gateOpen", 4000)) {
+        if (!ctx.isAnyGateOpenNearby(5)) {
+            boolean needsGate = !ctx.canReach(anchorX, anchorY, maxRadius, false);
+            if (!needsGate) {
+                Object testChicken = ctx.npcs().named("Chicken").attackable().nearest();
+                needsGate = (testChicken != null && (!ctx.canReach(testChicken) || !ctx.hasLineOfSight(testChicken)));
+            }
+            if (needsGate) {
+                Object gate = ctx.objects(8).named("Gate").hasAction("Open").within(4).nearest();
+                if (gate != null && !PluginContext.isOpenGateOrDoor(gate)) {
+                    script.setStatus("Opening " + gate.name);
+                    script.markTimer("gateOpen");
+                    ctx.interactObject(gate, "Open");
+                    return ctx.randomDelay(1400, 1700);
+                }
+            }
+        }
+    }
+
+    if (!ctx.isAt(anchorX, anchorY, maxRadius)) {
+        script.setStatus("Returning to coop");
+        if (autoOpenGates) {
+            ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
+        } else {
+            ctx.walkToSmart(anchorX, anchorY);
+        }
+        return ctx.randomDelay(1600, 2000);
+    }
+
+    if (buryBones) {
+        Object boneItem = ctx.inventory().id(ItemID.BONES).first();
+        if (boneItem == null) {
+            boneItem = ctx.inventory().named("Bones").first();
+        }
+        if (boneItem != null) {
+            script.setStatus("Burying bones");
+            ctx.buryInventoryItem(boneItem.slot);
+            bonesBuried++;
+            return ctx.randomDelay(850, 1100);
+        }
+    }
+
+    if (lootFeathers && (!ctx.isInventoryFull() || ctx.hasInventoryItem(ItemID.FEATHER) || ctx.hasInventoryItem("Feather"))) {
+        Object feather = ctx.groundItems().within(maxRadius).id(ItemID.FEATHER).reachable().nearest();
+        if (feather == null) {
+            feather = ctx.groundItems().within(maxRadius).named("Feather").reachable().nearest();
+        }
+        if (feather != null) {
+            script.setStatus("Looting feather (" + feather.amount + ")");
+            ctx.takeGroundItem(feather);
+            return ctx.randomDelay(1100, 1400);
+        }
+    }
+
+    if (buryBones && !ctx.isInventoryFull()) {
+        Object bones = ctx.groundItems().within(maxRadius).id(ItemID.BONES).reachable().nearest();
+        if (bones == null) {
+            bones = ctx.groundItems().within(maxRadius).named("Bones").reachable().nearest();
+        }
+        if (bones != null) {
+            script.setStatus("Looting bones");
+            ctx.takeGroundItem(bones);
+            return ctx.randomDelay(1100, 1400);
+        }
+    }
+
+    if (lootRawChicken && !ctx.isInventoryFull()) {
+        Object meat = ctx.groundItems().within(maxRadius).id(ItemID.RAW_CHICKEN).reachable().nearest();
+        if (meat == null) {
+            meat = ctx.groundItems().within(maxRadius).named("Raw chicken").reachable().nearest();
+        }
+        if (meat != null) {
+            script.setStatus("Looting raw chicken");
+            ctx.takeGroundItem(meat);
+            return ctx.randomDelay(1100, 1400);
+        }
+    }
+
+    if (attackChickens) {
+        Object chicken = ctx.npcs().named("Chicken").attackable().within(maxRadius).reachable().hasLineOfSight().nearest();
+        if (chicken != null) {
+            currentTargetNpcIndex = chicken.index;
+            lastAttackTime = System.currentTimeMillis();
+            script.setStatus("Attacking chicken");
+            ctx.interactNpc(chicken, "Attack");
+            return ctx.randomDelay(1350, 1650);
+        }
+    }
+
+    script.setStatus("Idle / Scanning");
+    return ctx.randomDelay(500, 700);
+}
+
+void onRenderOverlay(ctx, g) {
+    int x = 8;
+    int y = 28;
+    int w = 210;
+    int h = 104;
+    if (buryBones) {
+        h += 14;
+    }
+
+    g.drawPanel(x, y, w, h, "Feather Farmer");
+
+    int lineY = y + 32;
+    g.drawString("Status: " + script.getStatus(), x + 8, lineY, RSColors.WHITE, true);
+    lineY += 14;
+
+    g.drawString("Runtime: " + script.getFormattedRuntime(), x + 8, lineY, RSColors.YELLOW, true);
+    lineY += 14;
+
+    long runSec = Math.max(1, script.getRuntimeMs() / 1000);
+    long feathersPerHour = Math.round((feathersLooted * 3600) / runSec);
+    g.drawString("Feathers: " + feathersLooted + " (" + feathersPerHour + "/hr)", x + 8, lineY, RSColors.GREEN, true);
+    lineY += 14;
+
+    g.drawString("Chickens: " + chickensAttacked, x + 8, lineY, RSColors.CYAN, true);
+    lineY += 14;
+
+    long xpPerHour = Math.round((combatXpGained * 3600) / runSec);
+    g.drawString("Combat XP: " + script.formatCompactNumber(combatXpGained) + " (" + script.formatCompactNumber(xpPerHour) + "/hr)", x + 8, lineY, RSColors.GOLD, true);
+
+    if (buryBones) {
+        lineY += 14;
+        long prayerXpPerHour = Math.round((prayerXpGained * 3600) / runSec);
+        g.drawString("Bones: " + bonesBuried + " (" + script.formatCompactNumber(prayerXpGained) + " XP, " + script.formatCompactNumber(prayerXpPerHour) + "/hr)", x + 8, lineY, RSColors.CYAN, true);
+    }
+
+    if (anchorX != -1 && anchorY != -1) {
+        g.drawTileOverlay(anchorX, anchorY, 0x00ffff, "Anchor");
+    }
+
+    if (showDebugOverlay && ctx != null) {
+        g.drawPathOverlay(ctx.getLastComputedPath(), 0x00ffff);
+    }
+}
+
+void onXpGained(ctx, skillId, deltaXp) {
+    if (SkillID.isCombatSkill(skillId)) {
+        combatXpGained += deltaXp;
+    } else if (skillId == SkillID.PRAYER) {
+        prayerXpGained += deltaXp;
+    }
+}
+
+void onAnimationChanged(ctx, animId) {
+    if (animId > 0 && currentTargetNpcIndex != -1) {
+        lastAttackTime = System.currentTimeMillis();
+    }
+}
+
+void onGroundItemSpawned(ctx, item) {
+    if (lootFeathers && item != null && item.id == ItemID.FEATHER && item.getDistance() <= 1) {
+        if (ctx != null && ctx.canReach(item)) {
+            recentDrop = item;
+            recentDropTime = System.currentTimeMillis();
+        }
+    }
+}
+
+void onChatMessage(ctx, type, sender, message) {
+    if (message != null && message.toLowerCase().contains("can't reach that")) {
+        currentTargetNpcIndex = -1;
+        lastAttackTime = 0;
+        script.setStatus("Target blocked by obstacle");
+    }
+}

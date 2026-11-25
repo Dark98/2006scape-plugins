@@ -11,6 +11,17 @@
       "description": "Chops selected tree types and optionally burns or drops logs",
       "fileName": "SampleTreeCutter.script",
       "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
+    },
+    {
+      "id": "chicken-feather-farmer",
+      "name": "Chicken Feather Farmer",
+      "version": "1.0.0",
+      "minApi": "1.0.0",
+      "type": "script",
+      "author": "2006Scape",
+      "description": "Automatically loots feathers, attacks chickens, and buries bones in chicken coops.",
+      "fileName": "ChickenFeatherFarmer.script",
+      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/ChickenFeatherFarmer.script"
     }
   ]
 }
