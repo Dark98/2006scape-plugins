@@ -1,0 +1,82 @@
+// @name Sample Tree Cutter
+// @author 2006Scape
+// @version 1.0.0
+// @minApi 2.0.0
+// @desc Chops nearby trees and optionally burns or drops logs using the Script API
+// @type script
+// @config burnLogs|Burn Logs|bool|false
+// @config dropLogs|Drop Logs|bool|true
+
+boolean burnLogs = false;
+boolean dropLogs = true;
+
+void onStart(ctx) {
+    script.setStatus("Starting Tree Cutter");
+    if (ctx != null) {
+        ctx.sendClientMessage("Sample Tree Cutter started!");
+    }
+}
+
+void onConfigChanged(key, value) {
+    if (key == "burnLogs") {
+        burnLogs = value;
+    } else if (key == "dropLogs") {
+        dropLogs = value;
+    }
+}
+
+int loop(ctx) {
+    if (!ctx.isLoggedIn()) {
+        script.setStatus("Waiting for login");
+        return 1000;
+    }
+
+    ctx.ensureRunEnabled(25);
+
+    if (script.isStuck(15000)) {
+        script.setStatus("Watchdog reset");
+        script.resetWatchdog();
+    }
+
+    if (ctx.isInventoryFull()) {
+        Object logs = ctx.inventory().named("Logs", "Oak logs", "Willow logs").first();
+        if (logs != null) {
+            if (burnLogs) {
+                Object tinderbox = ctx.inventory().named("Tinderbox").first();
+                if (tinderbox != null) {
+                    script.setStatus("Lighting " + logs.name);
+                    ctx.useItemOnItem(tinderbox.slot, logs.slot);
+                    return ctx.randomDelay(1400, 1800);
+                }
+            }
+            if (dropLogs) {
+                script.setStatus("Dropping " + logs.name);
+                ctx.dropInventoryItem(logs.slot);
+                return ctx.randomDelay(500, 800);
+            }
+        }
+        script.setStatus("Inventory full");
+        return 1000;
+    }
+
+    if (!ctx.isPlayerIdle()) {
+        script.setStatus("Chopping...");
+        return ctx.randomDelay(600, 900);
+    }
+
+    Object tree = ctx.objects(18).named("Tree", "Oak").hasAction("Chop down").reachable().nearest();
+    if (tree != null) {
+        script.setStatus("Chopping " + tree.name);
+        ctx.interactObject(tree, "Chop down");
+        return ctx.randomDelay(1400, 1800);
+    }
+
+    script.setStatus("Scanning for trees");
+    return ctx.randomDelay(700, 1000);
+}
+
+void onStop(ctx) {
+    if (ctx != null) {
+        ctx.sendClientMessage("Sample Tree Cutter stopped.");
+    }
+}
