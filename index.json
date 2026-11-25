@@ -15,7 +15,7 @@
     {
       "id": "chicken-feather-farmer",
       "name": "Chicken Feather Farmer",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "minApi": "1.0.0",
       "type": "script",
       "author": "2006Scape",
@@ -26,7 +26,7 @@
     {
       "id": "cow-killer",
       "name": "Cow Killer",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "minApi": "1.0.0",
       "type": "script",
       "author": "2006Scape",

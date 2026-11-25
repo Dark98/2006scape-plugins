@@ -1,9 +1,10 @@
 // @name Chicken Feather Farmer
 // @author 2006Scape
-// @version 1.0.0
+// @version 1.0.1
 // @minApi 1.0.0
 // @desc Automatically loots feathers, attacks chickens, and buries bones in chicken coops.
 // @type script
+// @command feather,featherfarmer
 // @config lootFeathers|Loot Feathers|bool|true
 // @config attackChickens|Attack Chickens|bool|true
 // @config buryBones|Bury Bones|bool|true

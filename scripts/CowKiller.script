@@ -1,9 +1,10 @@
 // @name Cow Killer
 // @author 2006Scape
-// @version 1.0.0
+// @version 1.0.1
 // @minApi 1.0.0
 // @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
 // @type script
+// @command cow,cows,cowkiller
 // @config attackCows|Attack Cows|bool|true
 // @config attackCalves|Attack Calves|bool|true
 // @config buryBones|Bury Bones|bool|true
