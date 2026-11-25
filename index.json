@@ -4,11 +4,11 @@
     {
       "id": "sample-tree-cutter",
       "name": "Sample Tree Cutter",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "minApi": "2.0.0",
       "type": "script",
       "author": "2006Scape",
-      "description": "Chops nearby trees and optionally burns or drops logs using the Script API",
+      "description": "Chops selected tree types and optionally burns or drops logs",
       "fileName": "SampleTreeCutter.script",
       "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
     }

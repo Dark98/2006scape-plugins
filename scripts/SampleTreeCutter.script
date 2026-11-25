@@ -1,24 +1,28 @@
 // @name Sample Tree Cutter
 // @author 2006Scape
-// @version 1.0.0
+// @version 1.1.0
 // @minApi 2.0.0
-// @desc Chops nearby trees and optionally burns or drops logs using the Script API
+// @desc Chops selected tree types and optionally burns or drops logs
 // @type script
+// @config treeType|Tree Type|choice|Tree|Tree,Oak,Willow,Maple,Yew,Magic
 // @config burnLogs|Burn Logs|bool|false
 // @config dropLogs|Drop Logs|bool|true
 
+String treeType = "Tree";
 boolean burnLogs = false;
 boolean dropLogs = true;
 
 void onStart(ctx) {
-    script.setStatus("Starting Tree Cutter");
+    script.setStatus("Starting Tree Cutter (" + treeType + ")");
     if (ctx != null) {
-        ctx.sendClientMessage("Sample Tree Cutter started!");
+        ctx.sendClientMessage("Sample Tree Cutter started (" + treeType + ")!");
     }
 }
 
 void onConfigChanged(key, value) {
-    if (key == "burnLogs") {
+    if (key == "treeType") {
+        treeType = value;
+    } else if (key == "burnLogs") {
         burnLogs = value;
     } else if (key == "dropLogs") {
         dropLogs = value;
@@ -39,7 +43,7 @@ int loop(ctx) {
     }
 
     if (ctx.isInventoryFull()) {
-        Object logs = ctx.inventory().named("Logs", "Oak logs", "Willow logs").first();
+        Object logs = ctx.inventory().named("Logs", "Oak logs", "Willow logs", "Maple logs", "Yew logs", "Magic logs").first();
         if (logs != null) {
             if (burnLogs) {
                 Object tinderbox = ctx.inventory().named("Tinderbox").first();
@@ -60,18 +64,18 @@ int loop(ctx) {
     }
 
     if (!ctx.isPlayerIdle()) {
-        script.setStatus("Chopping...");
+        script.setStatus("Chopping " + treeType + "...");
         return ctx.randomDelay(600, 900);
     }
 
-    Object tree = ctx.objects(18).named("Tree", "Oak").hasAction("Chop down").reachable().nearest();
+    Object tree = ctx.objects(18).named(treeType).hasAction("Chop down").reachable().nearest();
     if (tree != null) {
         script.setStatus("Chopping " + tree.name);
         ctx.interactObject(tree, "Chop down");
         return ctx.randomDelay(1400, 1800);
     }
 
-    script.setStatus("Scanning for trees");
+    script.setStatus("Scanning for " + treeType);
     return ctx.randomDelay(700, 1000);
 }
 
