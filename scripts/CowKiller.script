@@ -1,0 +1,723 @@
+// @name Cow Killer
+// @author 2006Scape
+// @version 1.0.0
+// @minApi 1.0.0
+// @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
+// @type script
+// @config attackCows|Attack Cows|bool|true
+// @config attackCalves|Attack Calves|bool|true
+// @config buryBones|Bury Bones|bool|true
+// @config lootCowhides|Loot Cowhides|bool|true
+// @config lootRawBeef|Loot Raw Beef|bool|false
+// @config autoEatFood|Auto-Eat Food|bool|true
+// @config autoOpenGates|Open Pasture Gates|bool|true
+// @config bankLoot|Bank at Al-Kharid|bool|false
+// @config withdrawFoodOnBank|Restock Bread at Bank|bool|false
+// @config useSpecialAttack|Use Special Attack|bool|true
+// @config showDebugOverlay|Debug Path Overlay|bool|false
+// @config maxRadius|Max Radius|int|18|5|35
+
+boolean attackCows = true;
+boolean attackCalves = true;
+boolean buryBones = true;
+boolean lootCowhides = true;
+boolean lootRawBeef = false;
+boolean autoEatFood = true;
+boolean autoOpenGates = true;
+boolean bankLoot = false;
+boolean withdrawFoodOnBank = false;
+boolean useSpecialAttack = true;
+boolean showDebugOverlay = false;
+int maxRadius = 18;
+
+String state = "IDLE";
+int anchorX = -1;
+int anchorY = -1;
+int cowsKilled = 0;
+int bonesBuried = 0;
+int cowhidesLooted = 0;
+int rawBeefLooted = 0;
+int combatXpGained = 0;
+int prayerXpGained = 0;
+long totalGpValue = 0;
+int cowhideValue = 0;
+int beefValue = 0;
+
+int lastInventoryCowhideCount = -1;
+int lastInventoryBeefCount = -1;
+
+int currentTargetNpcIndex = -1;
+long lastAttackTime = 0;
+boolean bankingActive = false;
+boolean depositingDone = false;
+boolean exitedPasture = false;
+boolean returnedToPastureGate = false;
+Object recentDrop = null;
+long recentDropTime = 0;
+Object tollArea = null;
+
+void onConfigChanged(key, value) {
+    if (key == "attackCows") {
+        attackCows = value;
+    } else if (key == "attackCalves") {
+        attackCalves = value;
+    } else if (key == "buryBones") {
+        buryBones = value;
+    } else if (key == "lootCowhides") {
+        lootCowhides = value;
+    } else if (key == "lootRawBeef") {
+        lootRawBeef = value;
+    } else if (key == "autoEatFood") {
+        autoEatFood = value;
+    } else if (key == "autoOpenGates") {
+        autoOpenGates = value;
+    } else if (key == "bankLoot") {
+        bankLoot = value;
+    } else if (key == "withdrawFoodOnBank") {
+        withdrawFoodOnBank = value;
+    } else if (key == "useSpecialAttack") {
+        useSpecialAttack = value;
+    } else if (key == "showDebugOverlay") {
+        showDebugOverlay = value;
+    } else if (key == "maxRadius") {
+        maxRadius = value.intValue();
+    }
+}
+
+void onStart(ctx) {
+    if (ctx != null) {
+        tollArea = ctx.createArea(3266, 3225, 3269, 3230);
+        if (ctx.isLoggedIn()) {
+            anchorX = ctx.getPlayerX();
+            anchorY = ctx.getPlayerY();
+        }
+        lastInventoryCowhideCount = ctx.getInventoryItemCount(ItemID.COWHIDE);
+        lastInventoryBeefCount = ctx.getInventoryItemCount(ItemID.RAW_BEEF);
+    } else {
+        lastInventoryCowhideCount = 0;
+        lastInventoryBeefCount = 0;
+    }
+    state = "IDLE";
+    cowsKilled = 0;
+    bonesBuried = 0;
+    cowhidesLooted = 0;
+    rawBeefLooted = 0;
+    combatXpGained = 0;
+    prayerXpGained = 0;
+    totalGpValue = 0;
+    cowhideValue = 0;
+    beefValue = 0;
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    bankingActive = false;
+    depositingDone = false;
+    exitedPasture = false;
+    returnedToPastureGate = false;
+    recentDrop = null;
+    recentDropTime = 0;
+    script.setStatus("Started");
+    if (ctx != null) {
+        ctx.sendClientMessage("Cow Killer started! Anchor tile: (" + anchorX + ", " + anchorY + ")");
+    }
+}
+
+void onStop(ctx) {
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    if (ctx != null) {
+        ctx.sendClientMessage("Cow Killer stopped. Cows killed: " + cowsKilled + ", Bones buried: " + bonesBuried + ", Cowhides: " + cowhidesLooted);
+    }
+}
+
+void onPlayerDeath(ctx) {
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    bankingActive = false;
+    depositingDone = false;
+    exitedPasture = false;
+    returnedToPastureGate = false;
+    state = "IDLE";
+    script.setStatus("Died - resetting");
+    script.clearWait();
+}
+
+boolean npcHasAction(npc, action) {
+    if (npc == null || npc.actions == null) {
+        return false;
+    }
+    return PluginContext.hasAction(npc.actions, action);
+}
+
+boolean isEngagedWithTarget(ctx) {
+    if (currentTargetNpcIndex == -1) {
+        return false;
+    }
+    Object target = ctx.getNpcByIndex(currentTargetNpcIndex);
+    if (target == null || target.isDead()) {
+        if (target != null && target.isDead()) {
+            cowsKilled++;
+        } else if (lastAttackTime > 0 && (System.currentTimeMillis() - lastAttackTime) > 1500) {
+            cowsKilled++;
+        }
+        currentTargetNpcIndex = -1;
+        lastAttackTime = 0;
+        return false;
+    }
+
+    if (target.getDistance() > (maxRadius + 6)) {
+        currentTargetNpcIndex = -1;
+        lastAttackTime = 0;
+        return false;
+    }
+
+    long elapsed = System.currentTimeMillis() - lastAttackTime;
+    if (target.isAttackingPlayer || ctx.getPlayerInteractingIndex() == currentTargetNpcIndex || elapsed < 4500) {
+        return true;
+    }
+
+    currentTargetNpcIndex = -1;
+    lastAttackTime = 0;
+    return false;
+}
+
+Object findTargetCow(ctx) {
+    Object candidates = ctx.npcs().attackable().within(maxRadius).hasAction("Attack").reachable().hasLineOfSight().all();
+    Object best = null;
+    int bestDist = 999999;
+    int i = 0;
+    int count = candidates.size();
+    while (i < count) {
+        Object npc = candidates.get(i);
+        i++;
+        if (npc != null && script.hasElapsed("unreach_" + npc.index, 8000)) {
+            String lower = npc.name.toLowerCase();
+            if (!lower.contains("dairy cow")) {
+                boolean matches = false;
+                if (attackCalves && lower.contains("calf")) {
+                    matches = true;
+                }
+                if (attackCows && (lower == "cow" || lower.startsWith("cow "))) {
+                    matches = true;
+                }
+                if (matches) {
+                    int dist = npc.getDistance();
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = npc;
+                    }
+                }
+            }
+        }
+    }
+    return best;
+}
+
+Object findBorderGuard(ctx, onWestSide) {
+    Object guards = ctx.npcs().named("Border Guard").hasAction("Talk-to").within(8).reachable().all();
+    int i = 0;
+    int count = guards.size();
+    while (i < count) {
+        Object g = guards.get(i);
+        i++;
+        if (g != null) {
+            if (onWestSide && g.worldX <= 3267) {
+                return g;
+            }
+            if (!onWestSide && g.worldX >= 3268) {
+                return g;
+            }
+        }
+    }
+    Object allGuards = ctx.npcs().named("Border Guard").hasAction("Talk-to").within(8).all();
+    i = 0;
+    count = allGuards.size();
+    while (i < count) {
+        Object g = allGuards.get(i);
+        i++;
+        if (g != null) {
+            if (onWestSide && g.worldX <= 3267) {
+                return g;
+            }
+            if (!onWestSide && g.worldX >= 3268) {
+                return g;
+            }
+        }
+    }
+    return null;
+}
+
+int passAlKharidTollGate(ctx) {
+    if (ctx.getDialogueOptionCount() > 0) {
+        script.setStatus("Paying Al-Kharid toll");
+        if (!ctx.selectDialogueOption("pay")) {
+            ctx.selectDialogueOption(0);
+        }
+        return ctx.randomDelay(900, 1200);
+    }
+    int px = ctx.getPlayerX();
+    if (tollArea != null && !ctx.isInArea(tollArea)) {
+        script.setStatus("Approaching toll gate");
+        int targetX = 3268;
+        if (px <= 3267) {
+            targetX = 3267;
+        }
+        ctx.walkToSmart(targetX, 3228);
+        return ctx.randomDelay(900, 1300);
+    }
+    boolean onWestSide = px <= 3267;
+    Object guard = findBorderGuard(ctx, onWestSide);
+    if (guard != null) {
+        script.setStatus("Talking to Border Guard");
+        ctx.interactNpc(guard, "Talk-to");
+        return ctx.randomDelay(1100, 1500);
+    }
+    return ctx.randomDelay(700, 1000);
+}
+
+int handlePastureGateIfClosed(ctx) {
+    if (autoOpenGates && script.hasElapsed("gateOpen", 4000) && !ctx.isAnyGateOpenNearby(5)) {
+        Object gate = ctx.objects(8).named("Gate").hasAction("Open").within(4).nearest();
+        if (gate != null && !PluginContext.isOpenGateOrDoor(gate)) {
+            script.setStatus("Opening " + gate.name);
+            script.markTimer("gateOpen");
+            ctx.interactObject(gate, "Open");
+            return ctx.randomDelay(1400, 1700);
+        }
+    }
+    return -1;
+}
+
+int handleBanking(ctx) {
+    state = "BANKING";
+    int px = ctx.getPlayerX();
+    if (!depositingDone) {
+        if (px <= 3267) {
+            if (!exitedPasture) {
+                if (px <= 3251) {
+                    exitedPasture = true;
+                } else {
+                    if (!ctx.isAt(3254, 3267, 3)) {
+                        script.setStatus("Walking to pasture gate");
+                        ctx.walkToSmart(3254, 3267);
+                        return ctx.randomDelay(1000, 1400);
+                    }
+                    int gateDelay = handlePastureGateIfClosed(ctx);
+                    if (gateDelay > 0) {
+                        return gateDelay;
+                    }
+                    script.setStatus("Exiting pasture gate");
+                    ctx.walkToSmart(3250, 3267);
+                    return ctx.randomDelay(1000, 1400);
+                }
+            }
+            if (ctx.walkPathCoords(2, 3250, 3262, 3255, 3253, 3260, 3244, 3264, 3235, 3266, 3228)) {
+                script.setStatus("Walking to Al-Kharid gate");
+                return ctx.randomDelay(1000, 1400);
+            }
+            return passAlKharidTollGate(ctx);
+        }
+        exitedPasture = true;
+        if (ctx.walkPathCoords(4, 3275, 3220, 3281, 3211, 3281, 3201, 3281, 3191, 3281, 3181, 3278, 3173, 3274, 3167, 3270, 3167)) {
+            script.setStatus("Walking to Al-Kharid bank");
+            return ctx.randomDelay(1000, 1400);
+        }
+        if (!ctx.isBankOpen()) {
+            script.setStatus("Opening Al-Kharid bank");
+            ctx.openNearestBank();
+            return ctx.randomDelay(900, 1300);
+        }
+        script.setStatus("Depositing cowhides");
+        ctx.depositAllExcept("Coins", "Bread", "Cooked meat", "Trout", "Salmon", "Lobster");
+        Object coins = ctx.inventory().id(ItemID.COINS_995).first();
+        int coinCount = 0;
+        if (coins != null) {
+            coinCount = coins.amount;
+        }
+        int neededCoins = 20 - coinCount;
+        if (neededCoins > 0 && ctx.getBankItemCount(ItemID.COINS_995) >= neededCoins) {
+            ctx.withdrawItem(ItemID.COINS_995, neededCoins);
+            return ctx.randomDelay(600, 900);
+        }
+        if (withdrawFoodOnBank && ctx.inventory().hasAction("Eat").count() < 5 && ctx.hasBankItem(ItemID.BREAD)) {
+            ctx.withdrawItem(ItemID.BREAD, 5);
+        }
+        ctx.closeBank();
+        depositingDone = true;
+        return ctx.randomDelay(800, 1100);
+    }
+
+    if (px >= 3268) {
+        if (ctx.walkPathCoords(2, 3274, 3167, 3278, 3173, 3281, 3181, 3281, 3191, 3281, 3201, 3281, 3211, 3275, 3220, 3269, 3228)) {
+            script.setStatus("Returning to toll gate");
+            return ctx.randomDelay(1000, 1400);
+        }
+        return passAlKharidTollGate(ctx);
+    }
+    if (!returnedToPastureGate) {
+        if (ctx.isAt(3250, 3267, 3) || px <= 3251) {
+            returnedToPastureGate = true;
+        } else if (ctx.walkPathCoords(2, 3264, 3235, 3260, 3244, 3255, 3253, 3250, 3262, 3250, 3267)) {
+            script.setStatus("Returning to pasture gate");
+            return ctx.randomDelay(1000, 1400);
+        } else {
+            returnedToPastureGate = true;
+        }
+    }
+    if (ctx.isAt(3253, 3267, 4)) {
+        int gateDelay = handlePastureGateIfClosed(ctx);
+        if (gateDelay > 0) {
+            return gateDelay;
+        }
+    }
+    if (!ctx.isAt(anchorX, anchorY, maxRadius) || px <= 3252) {
+        script.setStatus("Entering pasture");
+        ctx.walkToSmart(anchorX, anchorY);
+        return ctx.randomDelay(1200, 1600);
+    }
+    bankingActive = false;
+    depositingDone = false;
+    exitedPasture = false;
+    returnedToPastureGate = false;
+    state = "IDLE";
+    return ctx.randomDelay(500, 700);
+}
+
+int loop(ctx) {
+    if (!ctx.isLoggedIn()) {
+        script.setStatus("Waiting for login");
+        return 1000;
+    }
+
+    if (ctx.canContinueDialogue()) {
+        script.setStatus("Continuing dialogue");
+        ctx.continueDialogue();
+        return ctx.randomDelay(600, 900);
+    }
+
+    ctx.ensureRunEnabled(25);
+
+    if (script.isStuck(20000)) {
+        script.setStatus("Watchdog: recovering");
+        script.clearWait();
+        currentTargetNpcIndex = -1;
+        script.resetWatchdog();
+    }
+
+    if (useSpecialAttack && state == "FIGHTING" && ctx.getSpecialEnergy() >= 50 && !ctx.isSpecialAttackActive()) {
+        ctx.setSpecialAttack(true);
+    }
+
+    if (anchorX == -1 || anchorY == -1) {
+        anchorX = ctx.getPlayerX();
+        anchorY = ctx.getPlayerY();
+    }
+    if (tollArea == null) {
+        tollArea = ctx.createArea(3266, 3225, 3269, 3230);
+    }
+
+    int currentCowhides = ctx.getInventoryItemCount(ItemID.COWHIDE);
+    if (lastInventoryCowhideCount != -1 && currentCowhides > lastInventoryCowhideCount) {
+        int gained = currentCowhides - lastInventoryCowhideCount;
+        cowhidesLooted += gained;
+        totalGpValue += gained * Math.max(1, cowhideValue);
+    }
+    lastInventoryCowhideCount = currentCowhides;
+
+    int currentBeef = ctx.getInventoryItemCount(ItemID.RAW_BEEF);
+    if (lastInventoryBeefCount != -1 && currentBeef > lastInventoryBeefCount) {
+        int gained = currentBeef - lastInventoryBeefCount;
+        rawBeefLooted += gained;
+        totalGpValue += gained * Math.max(1, beefValue);
+    }
+    lastInventoryBeefCount = currentBeef;
+
+    if (bankLoot && !bankingActive && ctx.isInventoryFull()) {
+        bankingActive = true;
+        depositingDone = false;
+        exitedPasture = false;
+    }
+    if (bankingActive) {
+        return handleBanking(ctx);
+    }
+
+    if (autoEatFood) {
+        int hpPct = ctx.getPlayerHpPercent();
+        if (hpPct < 50) {
+            Object food = ctx.findFood();
+            if (food != null) {
+                state = "EATING";
+                script.setStatus("Eating " + food.name);
+                ctx.interactInventoryItem(food.slot, "Eat");
+                return ctx.randomDelay(1100, 1350);
+            } else if (hpPct < 25) {
+                if (bankLoot) {
+                    bankingActive = true;
+                    depositingDone = false;
+                    return handleBanking(ctx);
+                }
+                script.setStatus("Low HP & out of food!");
+                ctx.sendClientMessage("Cow Killer stopped safely: HP < 25% and out of food.");
+                return -1;
+            }
+        }
+    }
+
+    if (isEngagedWithTarget(ctx)) {
+        state = "FIGHTING";
+        Object target = ctx.getNpcByIndex(currentTargetNpcIndex);
+        if (target != null && target.maxHealth > 0) {
+            script.setStatus("Fighting " + target.name + " (" + target.currentHealth + "/" + target.maxHealth + " HP)");
+        } else {
+            script.setStatus("Fighting Cow");
+        }
+        return ctx.randomDelay(550, 700);
+    }
+
+    if (!ctx.isInventoryFull()) {
+        Object underFoot = null;
+        if (recentDrop != null && (System.currentTimeMillis() - recentDropTime) < 5000) {
+            underFoot = recentDrop;
+            recentDrop = null;
+        } else if (lootCowhides) {
+            underFoot = ctx.groundItems().within(1).id(ItemID.COWHIDE).reachable().nearest();
+            if (underFoot == null) {
+                underFoot = ctx.groundItems().within(1).named("Cowhide", "Cow hide").reachable().nearest();
+            }
+        }
+        if (underFoot != null && underFoot.getDistance() <= 1 && ctx.canReach(underFoot)) {
+            state = "LOOTING";
+            script.setStatus("Looting nearby " + underFoot.name);
+            ctx.takeGroundItem(underFoot);
+            return ctx.randomDelay(900, 1200);
+        }
+    }
+
+    Object attacker = ctx.getNpcAttackingPlayer();
+    if (attacker != null && !attacker.isDead() && npcHasAction(attacker, "Attack") && attacker.name.toLowerCase().contains("cow")) {
+        state = "FIGHTING";
+        currentTargetNpcIndex = attacker.index;
+        lastAttackTime = System.currentTimeMillis();
+        script.setStatus("Fighting " + attacker.name);
+        ctx.interactNpc(attacker, "Attack");
+        return ctx.randomDelay(900, 1150);
+    }
+
+    if (autoOpenGates && script.hasElapsed("gateOpen", 4000)) {
+        boolean needsGate = !ctx.canReach(anchorX, anchorY, maxRadius, false);
+        if (!needsGate) {
+            Object testCow = findTargetCow(ctx);
+            needsGate = (testCow == null && ctx.npcs().named("Cow").attackable().exists());
+        }
+        if (needsGate) {
+            if (!ctx.isAnyGateOpenNearby(5)) {
+                state = "OPENING_GATE";
+                int gateDelay = handlePastureGateIfClosed(ctx);
+                if (gateDelay > 0) {
+                    return gateDelay;
+                }
+            } else {
+                Object gates = ctx.objects(15).named("Gate").all();
+                Object openGate = null;
+                int bestDist = 999999;
+                int gi = 0;
+                int gCount = gates.size();
+                while (gi < gCount) {
+                    Object g = gates.get(gi);
+                    gi++;
+                    if (g != null && PluginContext.isOpenGateOrDoor(g)) {
+                        int d = g.getDistance();
+                        if (d < bestDist) {
+                            bestDist = d;
+                            openGate = g;
+                        }
+                    }
+                }
+                if (openGate != null && openGate.getDistance() > 1) {
+                    state = "RETURNING";
+                    script.setStatus("Stepping through open gate");
+                    ctx.walkToSmart(openGate.worldX, openGate.worldY);
+                    return ctx.randomDelay(1200, 1600);
+                }
+            }
+        }
+    }
+
+    if (!ctx.isAt(anchorX, anchorY, maxRadius)) {
+        state = "RETURNING";
+        script.setStatus("Returning to pasture");
+        ctx.walkToSmart(anchorX, anchorY);
+        return ctx.randomDelay(1600, 2000);
+    }
+
+    if (buryBones) {
+        Object boneItem = ctx.inventory().id(ItemID.BONES).first();
+        if (boneItem == null) {
+            boneItem = ctx.inventory().named("Bones").first();
+        }
+        if (boneItem != null) {
+            state = "BURYING";
+            script.setStatus("Burying bones");
+            ctx.buryInventoryItem(boneItem.slot);
+            bonesBuried++;
+            return ctx.randomDelay(850, 1100);
+        }
+    }
+
+    if (buryBones && !ctx.isInventoryFull()) {
+        Object bones = ctx.groundItems().within(maxRadius).id(ItemID.BONES).reachable().nearest();
+        if (bones == null) {
+            bones = ctx.groundItems().within(maxRadius).named("Bones").reachable().nearest();
+        }
+        if (bones != null) {
+            state = "LOOTING";
+            script.setStatus("Looting bones");
+            ctx.takeGroundItem(bones);
+            return ctx.randomDelay(1100, 1400);
+        }
+    }
+
+    if (lootCowhides && !ctx.isInventoryFull()) {
+        Object hide = ctx.groundItems().within(maxRadius).id(ItemID.COWHIDE).reachable().nearest();
+        if (hide == null) {
+            hide = ctx.groundItems().within(maxRadius).named("Cowhide", "Cow hide").reachable().nearest();
+        }
+        if (hide != null) {
+            state = "LOOTING";
+            cowhideValue = Math.max(cowhideValue, hide.value);
+            script.setStatus("Looting cowhide");
+            ctx.takeGroundItem(hide);
+            return ctx.randomDelay(1100, 1400);
+        }
+    }
+
+    if (lootRawBeef && !ctx.isInventoryFull()) {
+        Object beef = ctx.groundItems().within(maxRadius).id(ItemID.RAW_BEEF).reachable().nearest();
+        if (beef == null) {
+            beef = ctx.groundItems().within(maxRadius).named("Raw beef").reachable().nearest();
+        }
+        if (beef != null) {
+            state = "LOOTING";
+            beefValue = Math.max(beefValue, beef.value);
+            script.setStatus("Looting raw beef");
+            ctx.takeGroundItem(beef);
+            return ctx.randomDelay(1100, 1400);
+        }
+    }
+
+    if (attackCows || attackCalves) {
+        Object cow = findTargetCow(ctx);
+        if (cow != null) {
+            state = "FIGHTING";
+            currentTargetNpcIndex = cow.index;
+            lastAttackTime = System.currentTimeMillis();
+            script.setStatus("Attacking " + cow.name);
+            ctx.interactNpc(cow, "Attack");
+            return ctx.randomDelay(1350, 1650);
+        }
+    }
+
+    state = "IDLE";
+    script.setStatus("Idle / Scanning");
+    return ctx.randomDelay(500, 700);
+}
+
+void onRenderOverlay(ctx, g) {
+    int x = 8;
+    int y = 28;
+    int w = 210;
+    int h = 90;
+    if (buryBones) {
+        h += 14;
+    }
+    if (lootCowhides) {
+        h += 14;
+    }
+
+    g.drawPanel(x, y, w, h, "Cow Killer");
+
+    int lineY = y + 32;
+    g.drawString("Status: " + script.getStatus(), x + 8, lineY, RSColors.WHITE, true);
+    lineY += 14;
+
+    g.drawString("Runtime: " + script.getFormattedRuntime(), x + 8, lineY, RSColors.YELLOW, true);
+    lineY += 14;
+
+    long runSec = Math.max(1, script.getRuntimeMs() / 1000);
+    long cowsPerHour = Math.round((cowsKilled * 3600) / runSec);
+    g.drawString("Cows: " + cowsKilled + " (" + cowsPerHour + "/hr)", x + 8, lineY, RSColors.GREEN, true);
+    lineY += 14;
+
+    long xpPerHour = Math.round((combatXpGained * 3600) / runSec);
+    g.drawString("Combat XP: " + script.formatCompactNumber(combatXpGained) + " (" + script.formatCompactNumber(xpPerHour) + "/hr)", x + 8, lineY, RSColors.GOLD, true);
+
+    if (buryBones) {
+        lineY += 14;
+        long prayerXpPerHour = Math.round((prayerXpGained * 3600) / runSec);
+        g.drawString("Bones: " + bonesBuried + " (" + script.formatCompactNumber(prayerXpGained) + " XP, " + script.formatCompactNumber(prayerXpPerHour) + "/hr)", x + 8, lineY, RSColors.CYAN, true);
+    }
+
+    if (lootCowhides) {
+        lineY += 14;
+        long gpPerHour = Math.round((totalGpValue * 3600) / runSec);
+        g.drawString("Hides: " + cowhidesLooted + " (" + script.formatCompactNumber(totalGpValue) + " gp, " + script.formatCompactNumber(gpPerHour) + "/hr)", x + 8, lineY, RSColors.GOLD, true);
+    }
+
+    if (anchorX != -1 && anchorY != -1) {
+        g.drawTileOverlay(anchorX, anchorY, 0x00ffff, "Pasture");
+    }
+
+    if (currentTargetNpcIndex != -1 && ctx != null) {
+        Object target = ctx.getNpcByIndex(currentTargetNpcIndex);
+        if (target != null && !target.isDead()) {
+            g.drawTileOverlay(target.worldX, target.worldY, 0xff3333, target.name);
+        }
+    }
+
+    if (showDebugOverlay && ctx != null) {
+        if (tollArea != null) {
+            g.drawAreaOverlay(tollArea, 0x00ff00, "Toll");
+        }
+        g.drawPathOverlay(ctx.getLastComputedPath(), 0x00ffff);
+    }
+}
+
+void onChatMessage(ctx, type, sender, message) {
+    if (message != null && message.toLowerCase().contains("can't reach that")) {
+        if (currentTargetNpcIndex != -1) {
+            script.markTimer("unreach_" + currentTargetNpcIndex);
+        }
+        currentTargetNpcIndex = -1;
+        lastAttackTime = 0;
+        script.setStatus("Target blocked by obstacle");
+    }
+}
+
+void onXpGained(ctx, skillId, deltaXp) {
+    if (SkillID.isCombatSkill(skillId)) {
+        combatXpGained += deltaXp;
+    } else if (skillId == SkillID.PRAYER) {
+        prayerXpGained += deltaXp;
+    }
+}
+
+void onAnimationChanged(ctx, animId) {
+    if (animId > 0 && currentTargetNpcIndex != -1) {
+        lastAttackTime = System.currentTimeMillis();
+    }
+}
+
+void onGroundItemSpawned(ctx, item) {
+    if (item == null || ctx == null) {
+        return;
+    }
+    if (item.id == ItemID.COWHIDE) {
+        cowhideValue = Math.max(cowhideValue, item.value);
+    } else if (item.id == ItemID.RAW_BEEF) {
+        beefValue = Math.max(beefValue, item.value);
+    }
+    boolean wanted = (lootCowhides && item.id == ItemID.COWHIDE) || (buryBones && item.id == ItemID.BONES) || (lootRawBeef && item.id == ItemID.RAW_BEEF);
+    if (wanted && item.getDistance() <= 1 && ctx.canReach(item)) {
+        recentDrop = item;
+        recentDropTime = System.currentTimeMillis();
+    }
+}

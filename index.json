@@ -22,6 +22,17 @@
       "description": "Automatically loots feathers, attacks chickens, and buries bones in chicken coops.",
       "fileName": "ChickenFeatherFarmer.script",
       "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/ChickenFeatherFarmer.script"
+    },
+    {
+      "id": "cow-killer",
+      "name": "Cow Killer",
+      "version": "1.0.0",
+      "minApi": "1.0.0",
+      "type": "script",
+      "author": "2006Scape",
+      "description": "Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.",
+      "fileName": "CowKiller.script",
+      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/CowKiller.script"
     }
   ]
 }
