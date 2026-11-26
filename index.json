@@ -2,17 +2,6 @@
   "schemaVersion": 1,
   "plugins": [
     {
-      "id": "sample-tree-cutter",
-      "name": "Sample Tree Cutter",
-      "version": "1.1.0",
-      "minApi": "1.0.0",
-      "type": "script",
-      "author": "2006Scape",
-      "description": "Chops selected tree types and optionally burns or drops logs",
-      "fileName": "SampleTreeCutter.script",
-      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
-    },
-    {
       "id": "chicken-feather-farmer",
       "name": "Chicken Feather Farmer",
       "version": "1.0.4",
@@ -33,6 +22,17 @@
       "description": "Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.",
       "fileName": "CowKiller.script",
       "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/CowKiller.script"
+    },
+    {
+      "id": "sample-tree-cutter",
+      "name": "Sample Tree Cutter",
+      "version": "1.1.0",
+      "minApi": "1.0.0",
+      "type": "script",
+      "author": "2006Scape",
+      "description": "Chops selected tree types and optionally burns or drops logs",
+      "fileName": "SampleTreeCutter.script",
+      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
     }
   ]
 }
