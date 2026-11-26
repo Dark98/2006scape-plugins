@@ -1,6 +1,6 @@
 // @name Cow Killer
 // @author 2006Scape
-// @version 1.1.0
+// @version 1.1.1
 // @minApi 1.0.0
 // @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
 // @type script
@@ -280,13 +280,32 @@ int passAlKharidTollGate(ctx) {
 }
 
 int handlePastureGateIfClosed(ctx) {
-    if (autoOpenGates && script.hasElapsed("gateOpen", 4000) && !ctx.isAnyGateOpenNearby(5)) {
-        Object gate = ctx.objects(8).named("Gate").hasAction("Open").within(4).nearest();
-        if (gate != null && !PluginContext.isOpenGateOrDoor(gate)) {
-            script.setStatus("Opening " + gate.name);
+    if (autoOpenGates && script.hasElapsed("gateOpen", 3500)) {
+        Object gates = ctx.objects(15).named("Gate").hasAction("Open").all();
+        Object bestGate = null;
+        int bestDist = 999999;
+        int gi = 0;
+        int gCount = gates.size();
+        while (gi < gCount) {
+            Object g = gates.get(gi);
+            gi++;
+            if (g != null && !PluginContext.isOpenGateOrDoor(g)) {
+                int dAnchor = Math.max(Math.abs(g.worldX - anchorX), Math.abs(g.worldY - anchorY));
+                int dPasture = Math.max(Math.abs(g.worldX - 3253), Math.abs(g.worldY - 3267));
+                if (dAnchor <= 18 || dPasture <= 8) {
+                    int d = g.getDistance();
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestGate = g;
+                    }
+                }
+            }
+        }
+        if (bestGate != null) {
+            script.setStatus("Opening " + bestGate.name);
             script.markTimer("gateOpen");
-            ctx.interactObject(gate, "Open");
-            return ctx.randomDelay(1400, 1700);
+            ctx.interactObject(bestGate, "Open");
+            return ctx.randomDelay(1600, 2000);
         }
     }
     return -1;
@@ -385,9 +404,15 @@ int handleBanking(ctx) {
             return gateDelay;
         }
     }
-    if (!ctx.isAt(anchorX, anchorY, maxRadius) || px <= 3252) {
+    if (!ctx.isAt(anchorX, anchorY, maxRadius) || px <= 3252 || !ctx.canReach(anchorX, anchorY, maxRadius + 6, false)) {
+        if (ctx.isAt(3253, 3267, 6)) {
+            int gateDelay = handlePastureGateIfClosed(ctx);
+            if (gateDelay > 0) {
+                return gateDelay;
+            }
+        }
         script.setStatus("Entering pasture");
-        ctx.walkToSmart(anchorX, anchorY);
+        ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
         return ctx.randomDelay(1200, 1600);
     }
     bankingActive = false;
@@ -518,42 +543,28 @@ int loop(ctx) {
         return ctx.randomDelay(900, 1150);
     }
 
-    if (autoOpenGates && script.hasElapsed("gateOpen", 4000)) {
-        boolean needsGate = !ctx.canReach(anchorX, anchorY, maxRadius, false);
+    if (autoOpenGates) {
+        boolean canReachAnchor = ctx.canReach(anchorX, anchorY, maxRadius + 6, false);
+        boolean needsGate = !canReachAnchor;
         if (!needsGate) {
             Object testCow = findTargetCow(ctx);
             needsGate = (testCow == null && ctx.npcs().named("Cow").attackable().exists());
         }
         if (needsGate) {
-            if (!ctx.isAnyGateOpenNearby(5)) {
-                state = "OPENING_GATE";
-                int gateDelay = handlePastureGateIfClosed(ctx);
-                if (gateDelay > 0) {
-                    return gateDelay;
+            state = "OPENING_GATE";
+            int gateDelay = handlePastureGateIfClosed(ctx);
+            if (gateDelay > 0) {
+                return gateDelay;
+            }
+            if (!canReachAnchor) {
+                state = "RETURNING";
+                script.setStatus("Entering pasture");
+                if (ctx.isAnyGateOpenNearby(12) && ctx.distanceTo(anchorX, anchorY) <= 18) {
+                    ctx.walkTo(anchorX, anchorY);
+                } else {
+                    ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
                 }
-            } else {
-                Object gates = ctx.objects(15).named("Gate").all();
-                Object openGate = null;
-                int bestDist = 999999;
-                int gi = 0;
-                int gCount = gates.size();
-                while (gi < gCount) {
-                    Object g = gates.get(gi);
-                    gi++;
-                    if (g != null && PluginContext.isOpenGateOrDoor(g)) {
-                        int d = g.getDistance();
-                        if (d < bestDist) {
-                            bestDist = d;
-                            openGate = g;
-                        }
-                    }
-                }
-                if (openGate != null && openGate.getDistance() > 1) {
-                    state = "RETURNING";
-                    script.setStatus("Stepping through open gate");
-                    ctx.walkToSmart(openGate.worldX, openGate.worldY);
-                    return ctx.randomDelay(1200, 1600);
-                }
+                return ctx.randomDelay(1200, 1600);
             }
         }
     }
