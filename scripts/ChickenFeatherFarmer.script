@@ -1,6 +1,6 @@
 // @name Chicken Feather Farmer
 // @author 2006Scape
-// @version 1.0.7
+// @version 1.0.8
 // @minApi 1.0.0
 // @desc Automatically loots feathers, attacks chickens, and buries bones in chicken coops.
 // @type script
@@ -203,6 +203,16 @@ int loop(ctx) {
 
     if (autoOpenGates && ctx.isAt(anchorX, anchorY, maxRadius + 6)) {
         boolean canReachAnchor = ctx.canReach(anchorX, anchorY, maxRadius + 6, false);
+        if (!canReachAnchor && ctx.getPlayerX() >= 3238) {
+            if (ctx.getPlayerY() > 3232) {
+                script.setStatus("Walking to Lumbridge bridge");
+                ctx.walkToSmartOrOpenDoors(3236, 3226);
+                return ctx.randomDelay(1400, 1800);
+            }
+            script.setStatus("Crossing Lumbridge bridge");
+            ctx.walkToSmartOrOpenDoors(3228, 3226);
+            return ctx.randomDelay(1200, 1600);
+        }
         boolean needsGate = !canReachAnchor;
         if (!needsGate) {
             Object testChicken = ctx.npcs().named("Chicken").attackable().nearest();
@@ -248,6 +258,16 @@ int loop(ctx) {
     }
 
     if (!ctx.isAt(anchorX, anchorY, maxRadius)) {
+        if (ctx.getPlayerX() >= 3238 && !ctx.canReach(anchorX, anchorY, 25, false)) {
+            if (ctx.getPlayerY() > 3232) {
+                script.setStatus("Walking to Lumbridge bridge");
+                ctx.walkToSmartOrOpenDoors(3236, 3226);
+                return ctx.randomDelay(1400, 1800);
+            }
+            script.setStatus("Crossing Lumbridge bridge");
+            ctx.walkToSmartOrOpenDoors(3228, 3226);
+            return ctx.randomDelay(1200, 1600);
+        }
         if (ctx.distanceTo(anchorX, anchorY) > 25) {
             script.setStatus("Running to Lumbridge coop");
         } else {
