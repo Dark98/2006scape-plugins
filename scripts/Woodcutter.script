@@ -1,31 +1,27 @@
 // @name Woodcutter
 // @author 2006Scape
-// @version 1.2.0
+// @version 1.2.1
 // @minApi 1.0.0
 // @desc Chops selected tree types and optionally burns or drops logs
 // @type script
 // @config treeType|Tree Type|choice|Tree|Tree,Oak,Willow,Maple,Yew,Magic
-// @config burnLogs|Burn Logs|bool|false
-// @config dropLogs|Drop Logs|bool|true
+// @config logAction|Log Action|choice|Drop|Drop,Burn,Keep
 
 String treeType = "Tree";
-boolean burnLogs = false;
-boolean dropLogs = true;
+String logAction = "Drop";
 
 void onStart(ctx) {
     script.setStatus("Starting Woodcutter (" + treeType + ")");
     if (ctx != null) {
-        ctx.sendClientMessage("Woodcutter started (" + treeType + ")!");
+        ctx.sendClientMessage("Woodcutter started (" + treeType + " / " + logAction + ")!");
     }
 }
 
 void onConfigChanged(key, value) {
     if (key == "treeType") {
         treeType = value;
-    } else if (key == "burnLogs") {
-        burnLogs = value;
-    } else if (key == "dropLogs") {
-        dropLogs = value;
+    } else if (key == "logAction") {
+        logAction = value;
     }
 }
 
@@ -45,15 +41,17 @@ int loop(ctx) {
     if (ctx.isInventoryFull()) {
         Object logs = ctx.inventory().named("Logs", "Oak logs", "Willow logs", "Maple logs", "Yew logs", "Magic logs").first();
         if (logs != null) {
-            if (burnLogs) {
+            if (logAction == "Burn") {
                 Object tinderbox = ctx.inventory().named("Tinderbox").first();
                 if (tinderbox != null) {
                     script.setStatus("Lighting " + logs.name);
                     ctx.useItemOnItem(tinderbox.slot, logs.slot);
                     return ctx.randomDelay(1400, 1800);
                 }
+                script.setStatus("Need Tinderbox to burn");
+                return 1000;
             }
-            if (dropLogs) {
+            if (logAction == "Drop") {
                 script.setStatus("Dropping " + logs.name);
                 ctx.dropInventoryItem(logs.slot);
                 return ctx.randomDelay(500, 800);
