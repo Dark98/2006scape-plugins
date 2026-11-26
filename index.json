@@ -10,7 +10,7 @@
       "author": "2006Scape",
       "description": "Automatically loots feathers, attacks chickens, and buries bones in chicken coops.",
       "fileName": "ChickenFeatherFarmer.script",
-      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/ChickenFeatherFarmer.script"
+      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/ChickenFeatherFarmer.script"
     },
     {
       "id": "cow-killer",
@@ -21,7 +21,7 @@
       "author": "2006Scape",
       "description": "Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.",
       "fileName": "CowKiller.script",
-      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/CowKiller.script"
+      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/CowKiller.script"
     },
     {
       "id": "sample-tree-cutter",
@@ -32,7 +32,7 @@
       "author": "2006Scape",
       "description": "Chops selected tree types and optionally burns or drops logs",
       "fileName": "SampleTreeCutter.script",
-      "downloadUrl": "https://raw.githubusercontent.com/dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
+      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
     }
   ]
 }
