@@ -1,6 +1,6 @@
-// @name Sample Tree Cutter
+// @name Woodcutter
 // @author 2006Scape
-// @version 1.1.0
+// @version 1.2.0
 // @minApi 1.0.0
 // @desc Chops selected tree types and optionally burns or drops logs
 // @type script
@@ -13,9 +13,9 @@ boolean burnLogs = false;
 boolean dropLogs = true;
 
 void onStart(ctx) {
-    script.setStatus("Starting Tree Cutter (" + treeType + ")");
+    script.setStatus("Starting Woodcutter (" + treeType + ")");
     if (ctx != null) {
-        ctx.sendClientMessage("Sample Tree Cutter started (" + treeType + ")!");
+        ctx.sendClientMessage("Woodcutter started (" + treeType + ")!");
     }
 }
 
@@ -81,6 +81,6 @@ int loop(ctx) {
 
 void onStop(ctx) {
     if (ctx != null) {
-        ctx.sendClientMessage("Sample Tree Cutter stopped.");
+        ctx.sendClientMessage("Woodcutter stopped.");
     }
 }
