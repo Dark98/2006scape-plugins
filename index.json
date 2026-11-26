@@ -24,15 +24,15 @@
       "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/CowKiller.script"
     },
     {
-      "id": "sample-tree-cutter",
-      "name": "Sample Tree Cutter",
-      "version": "1.1.0",
+      "id": "woodcutter",
+      "name": "Woodcutter",
+      "version": "1.2.0",
       "minApi": "1.0.0",
       "type": "script",
       "author": "2006Scape",
       "description": "Chops selected tree types and optionally burns or drops logs",
-      "fileName": "SampleTreeCutter.script",
-      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/SampleTreeCutter.script"
+      "fileName": "Woodcutter.script",
+      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/Woodcutter.script"
     }
   ]
 }
