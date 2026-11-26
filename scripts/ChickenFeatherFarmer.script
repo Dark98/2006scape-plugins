@@ -1,6 +1,6 @@
 // @name Chicken Feather Farmer
 // @author 2006Scape
-// @version 1.0.6
+// @version 1.0.7
 // @minApi 1.0.0
 // @desc Automatically loots feathers, attacks chickens, and buries bones in chicken coops.
 // @type script
@@ -209,13 +209,30 @@ int loop(ctx) {
             needsGate = (testChicken != null && (!ctx.canReach(testChicken) || !ctx.hasLineOfSight(testChicken)));
         }
         if (needsGate) {
-            if (script.hasElapsed("gateOpen", 3000)) {
-                Object gate = ctx.objects(15).named("Gate").hasAction("Open").nearest();
-                if (gate != null && !PluginContext.isOpenGateOrDoor(gate)) {
-                    script.setStatus("Opening " + gate.name);
+            if (script.hasElapsed("gateOpen", 3500)) {
+                Object gates = ctx.objects(15).named("Gate").hasAction("Open").all();
+                Object bestGate = null;
+                int bestAnchorDist = 999999;
+                int gi = 0;
+                int gCount = gates.size();
+                while (gi < gCount) {
+                    Object g = gates.get(gi);
+                    gi++;
+                    if (g != null && !PluginContext.isOpenGateOrDoor(g)) {
+                        int adx = Math.abs(g.worldX - anchorX);
+                        int ady = Math.abs(g.worldY - anchorY);
+                        int anchorDist = Math.max(adx, ady);
+                        if (anchorDist <= 10 && anchorDist < bestAnchorDist) {
+                            bestAnchorDist = anchorDist;
+                            bestGate = g;
+                        }
+                    }
+                }
+                if (bestGate != null) {
+                    script.setStatus("Opening " + bestGate.name);
                     script.markTimer("gateOpen");
-                    ctx.interactObject(gate, "Open");
-                    return ctx.randomDelay(1400, 1700);
+                    ctx.interactObject(bestGate, "Open");
+                    return ctx.randomDelay(1800, 2200);
                 }
             }
             if (!canReachAnchor) {
