@@ -1,6 +1,6 @@
 // @name Cow Killer
 // @author 2006Scape
-// @version 1.1.2
+// @version 1.1.3
 // @minApi 1.0.0
 // @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
 // @type script
@@ -91,7 +91,7 @@ void onConfigChanged(key, value) {
 
 void initAnchor(ctx) {
     if (ctx != null && ctx.isLoggedIn()) {
-        if (ctx.npcs().named("Cow", "Cow calf").within(20).exists()) {
+        if (ctx.npcs().named("Cow", "Cow calf").within(maxRadius).exists()) {
             anchorX = ctx.getPlayerX();
             anchorY = ctx.getPlayerY();
         } else {
