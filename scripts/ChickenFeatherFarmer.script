@@ -1,6 +1,6 @@
 // @name Chicken Feather Farmer
 // @author 2006Scape
-// @version 1.0.3
+// @version 1.0.4
 // @minApi 1.0.0
 // @desc Automatically loots feathers, attacks chickens, and buries bones in chicken coops.
 // @type script
@@ -219,7 +219,11 @@ int loop(ctx) {
             }
             if (!ctx.canReach(anchorX, anchorY, maxRadius + 6, false)) {
                 script.setStatus("Entering coop");
-                ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
+                if (ctx.isAnyGateOpenNearby(8) && ctx.distanceTo(anchorX, anchorY) <= 15) {
+                    ctx.walkTo(anchorX, anchorY);
+                } else {
+                    ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
+                }
                 return ctx.randomDelay(1200, 1600);
             }
         }
