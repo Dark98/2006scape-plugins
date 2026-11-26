@@ -1,6 +1,6 @@
 // @name Cow Killer
 // @author 2006Scape
-// @version 1.0.1
+// @version 1.1.0
 // @minApi 1.0.0
 // @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
 // @type script
@@ -13,6 +13,7 @@
 // @config autoEatFood|Auto-Eat Food|bool|true
 // @config autoOpenGates|Open Pasture Gates|bool|true
 // @config bankLoot|Bank at Al-Kharid|bool|false
+// @config useTollGate|Use Toll Gate|bool|true|when:bankLoot
 // @config withdrawFoodOnBank|Restock Bread at Bank|bool|false
 // @config useSpecialAttack|Use Special Attack|bool|true
 // @config showDebugOverlay|Debug Path Overlay|bool|false
@@ -26,6 +27,7 @@ boolean lootRawBeef = false;
 boolean autoEatFood = true;
 boolean autoOpenGates = true;
 boolean bankLoot = false;
+boolean useTollGate = true;
 boolean withdrawFoodOnBank = false;
 boolean useSpecialAttack = true;
 boolean showDebugOverlay = false;
@@ -74,6 +76,8 @@ void onConfigChanged(key, value) {
         autoOpenGates = value;
     } else if (key == "bankLoot") {
         bankLoot = value;
+    } else if (key == "useTollGate") {
+        useTollGate = value;
     } else if (key == "withdrawFoodOnBank") {
         withdrawFoodOnBank = value;
     } else if (key == "useSpecialAttack") {
@@ -292,35 +296,40 @@ int handleBanking(ctx) {
     state = "BANKING";
     int px = ctx.getPlayerX();
     if (!depositingDone) {
-        if (px <= 3267) {
-            if (!exitedPasture) {
-                if (px <= 3251) {
-                    exitedPasture = true;
-                } else {
-                    if (!ctx.isAt(3254, 3267, 3)) {
-                        script.setStatus("Walking to pasture gate");
-                        ctx.walkToSmart(3254, 3267);
-                        return ctx.randomDelay(1000, 1400);
-                    }
-                    int gateDelay = handlePastureGateIfClosed(ctx);
-                    if (gateDelay > 0) {
-                        return gateDelay;
-                    }
-                    script.setStatus("Exiting pasture gate");
-                    ctx.walkToSmart(3250, 3267);
+        if (!exitedPasture) {
+            if (px <= 3251 || px >= 3268) {
+                exitedPasture = true;
+            } else {
+                if (!ctx.isAt(3254, 3267, 3)) {
+                    script.setStatus("Walking to pasture gate");
+                    ctx.walkToSmart(3254, 3267);
                     return ctx.randomDelay(1000, 1400);
                 }
-            }
-            if (ctx.walkPathCoords(2, 3250, 3262, 3255, 3253, 3260, 3244, 3264, 3235, 3266, 3228)) {
-                script.setStatus("Walking to Al-Kharid gate");
+                int gateDelay = handlePastureGateIfClosed(ctx);
+                if (gateDelay > 0) {
+                    return gateDelay;
+                }
+                script.setStatus("Exiting pasture gate");
+                ctx.walkToSmart(3250, 3267);
                 return ctx.randomDelay(1000, 1400);
             }
-            return passAlKharidTollGate(ctx);
         }
-        exitedPasture = true;
-        if (ctx.walkPathCoords(4, 3275, 3220, 3281, 3211, 3281, 3201, 3281, 3191, 3281, 3181, 3278, 3173, 3274, 3167, 3270, 3167)) {
+        if (useTollGate) {
+            if (px <= 3267) {
+                if (ctx.walkPathCoords(2, 3250, 3262, 3255, 3253, 3260, 3244, 3264, 3235, 3266, 3228)) {
+                    script.setStatus("Walking to Al-Kharid gate");
+                    return ctx.randomDelay(1000, 1400);
+                }
+                return passAlKharidTollGate(ctx);
+            }
+            if (ctx.walkPathCoords(4, 3275, 3220, 3281, 3211, 3281, 3201, 3281, 3191, 3281, 3181, 3278, 3173, 3274, 3167, 3270, 3167)) {
+                script.setStatus("Walking to Al-Kharid bank");
+                return ctx.randomDelay(1000, 1400);
+            }
+        } else if (!ctx.isAt(3270, 3167, 4)) {
             script.setStatus("Walking to Al-Kharid bank");
-            return ctx.randomDelay(1000, 1400);
+            ctx.walkToSmartOrOpenDoors(3270, 3167);
+            return ctx.randomDelay(1200, 1600);
         }
         if (!ctx.isBankOpen()) {
             script.setStatus("Opening Al-Kharid bank");
@@ -329,15 +338,17 @@ int handleBanking(ctx) {
         }
         script.setStatus("Depositing cowhides");
         ctx.depositAllExcept("Coins", "Bread", "Cooked meat", "Trout", "Salmon", "Lobster");
-        Object coins = ctx.inventory().id(ItemID.COINS_995).first();
-        int coinCount = 0;
-        if (coins != null) {
-            coinCount = coins.amount;
-        }
-        int neededCoins = 20 - coinCount;
-        if (neededCoins > 0 && ctx.getBankItemCount(ItemID.COINS_995) >= neededCoins) {
-            ctx.withdrawItem(ItemID.COINS_995, neededCoins);
-            return ctx.randomDelay(600, 900);
+        if (useTollGate) {
+            Object coins = ctx.inventory().id(ItemID.COINS_995).first();
+            int coinCount = 0;
+            if (coins != null) {
+                coinCount = coins.amount;
+            }
+            int neededCoins = 20 - coinCount;
+            if (neededCoins > 0 && ctx.getBankItemCount(ItemID.COINS_995) >= neededCoins) {
+                ctx.withdrawItem(ItemID.COINS_995, neededCoins);
+                return ctx.randomDelay(600, 900);
+            }
         }
         if (withdrawFoodOnBank && ctx.inventory().hasAction("Eat").count() < 5 && ctx.hasBankItem(ItemID.BREAD)) {
             ctx.withdrawItem(ItemID.BREAD, 5);
@@ -347,7 +358,7 @@ int handleBanking(ctx) {
         return ctx.randomDelay(800, 1100);
     }
 
-    if (px >= 3268) {
+    if (useTollGate && px >= 3268) {
         if (ctx.walkPathCoords(2, 3274, 3167, 3278, 3173, 3281, 3181, 3281, 3191, 3281, 3201, 3281, 3211, 3275, 3220, 3269, 3228)) {
             script.setStatus("Returning to toll gate");
             return ctx.randomDelay(1000, 1400);
@@ -355,11 +366,15 @@ int handleBanking(ctx) {
         return passAlKharidTollGate(ctx);
     }
     if (!returnedToPastureGate) {
-        if (ctx.isAt(3250, 3267, 3) || px <= 3251) {
+        if (ctx.isAt(3250, 3267, 3) || (useTollGate && px <= 3251)) {
             returnedToPastureGate = true;
-        } else if (ctx.walkPathCoords(2, 3264, 3235, 3260, 3244, 3255, 3253, 3250, 3262, 3250, 3267)) {
+        } else if (useTollGate && ctx.walkPathCoords(2, 3264, 3235, 3260, 3244, 3255, 3253, 3250, 3262, 3250, 3267)) {
             script.setStatus("Returning to pasture gate");
             return ctx.randomDelay(1000, 1400);
+        } else if (!useTollGate && !ctx.isAt(3250, 3267, 4)) {
+            script.setStatus("Returning to pasture gate");
+            ctx.walkToSmartOrOpenDoors(3250, 3267);
+            return ctx.randomDelay(1200, 1600);
         } else {
             returnedToPastureGate = true;
         }
