@@ -2,15 +2,15 @@
   "schemaVersion": 1,
   "plugins": [
     {
-      "id": "auto-runner",
-      "name": "Auto Runner",
-      "version": "1.0.0",
+      "id": "auto-walker",
+      "name": "Auto Walker",
+      "version": "1.1.0",
       "minApi": "1.0.0",
       "type": "script",
       "author": "2006Scape",
-      "description": "Automatically runs to a selected destination using smart pathing and the F2P road network.",
-      "fileName": "AutoRunner.script",
-      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/AutoRunner.script"
+      "description": "Automatically walks/runs to a selected destination using smart pathing and the F2P road network.",
+      "fileName": "AutoWalker.script",
+      "downloadUrl": "https://raw.githubusercontent.com/Dark98/2006scape-plugins/main/scripts/AutoWalker.script"
     },
     {
       "id": "chicken-feather-farmer",
