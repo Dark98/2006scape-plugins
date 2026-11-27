@@ -1,6 +1,6 @@
 // @name Cow Killer
 // @author 2006Scape
-// @version 1.1.5
+// @version 1.1.6
 // @minApi 1.0.0
 // @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
 // @type script
@@ -91,9 +91,14 @@ void onConfigChanged(key, value) {
 
 void initAnchor(ctx) {
     if (ctx != null && ctx.isLoggedIn()) {
-        if (ctx.npcs().named("Cow", "Cow calf").within(maxRadius).exists()) {
-            anchorX = ctx.getPlayerX();
-            anchorY = ctx.getPlayerY();
+        int px = ctx.getPlayerX();
+        int py = ctx.getPlayerY();
+        if (px >= 3240 && px <= 3266 && py >= 3255 && py <= 3298) {
+            anchorX = 3257;
+            anchorY = 3272;
+        } else if (ctx.npcs().named("Cow", "Cow calf").within(maxRadius).exists()) {
+            anchorX = px;
+            anchorY = py;
         } else {
             anchorX = 3257;
             anchorY = 3272;
@@ -421,6 +426,11 @@ int handleBanking(ctx) {
             if (gateDelay > 0) {
                 return gateDelay;
             }
+            if (px <= 3254) {
+                script.setStatus("Stepping into pasture");
+                ctx.walkTo(3257, 3267);
+                return ctx.randomDelay(1100, 1500);
+            }
         }
         script.setStatus("Entering pasture");
         ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
@@ -569,7 +579,9 @@ int loop(ctx) {
             if (!canReachAnchor) {
                 state = "RETURNING";
                 script.setStatus("Entering pasture");
-                if (ctx.isAnyGateOpenNearby(12) && ctx.distanceTo(anchorX, anchorY) <= 18) {
+                if (ctx.isAt(3253, 3267, 8) && ctx.getPlayerX() <= 3254) {
+                    ctx.walkTo(3257, 3267);
+                } else if (ctx.isAnyGateOpenNearby(12) && ctx.distanceTo(anchorX, anchorY) <= 18) {
                     ctx.walkTo(anchorX, anchorY);
                 } else {
                     ctx.walkToSmartOrOpenDoors(anchorX, anchorY);
