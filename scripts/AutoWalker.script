@@ -1,10 +1,10 @@
-// @name Auto Runner
+// @name Auto Walker
 // @author 2006Scape
-// @version 1.0.0
+// @version 1.1.0
 // @minApi 1.0.0
-// @desc Automatically runs to a selected destination using smart pathing and the F2P road network.
+// @desc Automatically walks/runs to a selected destination using smart pathing and the F2P road network.
 // @type script
-// @config destination|Destination|choice|Lumbridge Castle|Lumbridge Castle,Lumbridge Coop,Lumbridge Cows,Al-Kharid Bank,Draynor Bank,Port Sarim,Rimmington,Falador East Bank,Falador West Bank,Barbarian Village,Edgeville Bank,Varrock Square,Varrock West Bank,Varrock East Bank,Taverley
+// @config destination|Destination|choice|Lumbridge Castle|Lumbridge Castle,Lumbridge Coop,Lumbridge Cows,Lumbridge Mill,Lumbridge Swamp,Al-Kharid Bank,Al-Kharid Mine,Draynor Bank,Draynor Market,Port Sarim,Rimmington,Crafting Guild,Falador East Bank,Falador West Bank,Falador North Gate,Taverley,Barbarian Village,Edgeville Bank,Champions Guild,Varrock Square,Varrock West Bank,Varrock East Bank,Varrock East Gate,Varrock SE Mine
 // @config stopOnArrival|Stop on Arrival|bool|true
 // @config showDebugPath|Debug Path Overlay|bool|true
 
@@ -23,32 +23,56 @@ void resolveDestination() {
         targetX = 3236;
         targetY = 3293;
     } else if (destination == "Lumbridge Cows") {
-        targetX = 3250;
-        targetY = 3267;
+        targetX = 3257;
+        targetY = 3272;
+    } else if (destination == "Lumbridge Mill") {
+        targetX = 3166;
+        targetY = 3305;
+    } else if (destination == "Lumbridge Swamp") {
+        targetX = 3200;
+        targetY = 3172;
     } else if (destination == "Al-Kharid Bank") {
         targetX = 3270;
         targetY = 3167;
+    } else if (destination == "Al-Kharid Mine") {
+        targetX = 3300;
+        targetY = 3285;
     } else if (destination == "Draynor Bank") {
         targetX = 3092;
         targetY = 3243;
+    } else if (destination == "Draynor Market") {
+        targetX = 3080;
+        targetY = 3250;
     } else if (destination == "Port Sarim") {
         targetX = 3028;
         targetY = 3217;
     } else if (destination == "Rimmington") {
         targetX = 2957;
         targetY = 3214;
+    } else if (destination == "Crafting Guild") {
+        targetX = 2933;
+        targetY = 3292;
     } else if (destination == "Falador East Bank") {
         targetX = 3013;
         targetY = 3355;
     } else if (destination == "Falador West Bank") {
         targetX = 2946;
         targetY = 3368;
+    } else if (destination == "Falador North Gate") {
+        targetX = 2965;
+        targetY = 3405;
+    } else if (destination == "Taverley") {
+        targetX = 2895;
+        targetY = 3440;
     } else if (destination == "Barbarian Village") {
         targetX = 3080;
         targetY = 3420;
     } else if (destination == "Edgeville Bank") {
         targetX = 3094;
         targetY = 3492;
+    } else if (destination == "Champions Guild") {
+        targetX = 3191;
+        targetY = 3362;
     } else if (destination == "Varrock Square") {
         targetX = 3212;
         targetY = 3428;
@@ -58,9 +82,12 @@ void resolveDestination() {
     } else if (destination == "Varrock East Bank") {
         targetX = 3253;
         targetY = 3420;
-    } else if (destination == "Taverley") {
-        targetX = 2895;
-        targetY = 3440;
+    } else if (destination == "Varrock East Gate") {
+        targetX = 3273;
+        targetY = 3428;
+    } else if (destination == "Varrock SE Mine") {
+        targetX = 3285;
+        targetY = 3370;
     }
 }
 
@@ -77,15 +104,15 @@ void onConfigChanged(key, value) {
 
 void onStart(ctx) {
     resolveDestination();
-    script.setStatus("Running to " + destination);
+    script.setStatus("Walking to " + destination);
     if (ctx != null) {
-        ctx.sendClientMessage("Auto Runner started -> " + destination + " (" + targetX + ", " + targetY + ")");
+        ctx.sendClientMessage("Auto Walker started -> " + destination + " (" + targetX + ", " + targetY + ")");
     }
 }
 
 void onStop(ctx) {
     if (ctx != null) {
-        ctx.sendClientMessage("Auto Runner stopped.");
+        ctx.sendClientMessage("Auto Walker stopped.");
     }
 }
 
@@ -111,13 +138,13 @@ int loop(ctx) {
     if (ctx.isAt(targetX, targetY, 4)) {
         script.setStatus("Arrived at " + destination);
         if (stopOnArrival) {
-            ctx.sendClientMessage("Auto Runner arrived at " + destination + "!");
+            ctx.sendClientMessage("Auto Walker arrived at " + destination + "!");
             return -1;
         }
         return 1500;
     }
 
-    script.setStatus("Running to " + destination);
+    script.setStatus("Walking to " + destination);
     ctx.walkToSmartOrOpenDoors(targetX, targetY);
     return ctx.randomDelay(1000, 1400);
 }
@@ -128,7 +155,7 @@ void onRenderOverlay(ctx, g) {
     int w = 220;
     int h = 88;
 
-    g.drawPanel(x, y, w, h, "Auto Runner");
+    g.drawPanel(x, y, w, h, "Auto Walker");
 
     int lineY = y + 32;
     g.drawString("Status: " + script.getStatus(), x + 8, lineY, RSColors.WHITE, true);
