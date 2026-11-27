@@ -1,6 +1,6 @@
 // @name Cow Killer
 // @author 2006Scape
-// @version 1.1.3
+// @version 1.1.4
 // @minApi 1.0.0
 // @desc Attacks cows, picks up and buries bones for Prayer XP, and loots cowhides.
 // @type script
@@ -327,7 +327,7 @@ int handleBanking(ctx) {
     int px = ctx.getPlayerX();
     if (!depositingDone) {
         if (!exitedPasture) {
-            if (px <= 3251 || px >= 3268) {
+            if (px <= 3248 || px >= 3268) {
                 exitedPasture = true;
             } else {
                 if (!ctx.isAt(3254, 3267, 3)) {
@@ -340,7 +340,7 @@ int handleBanking(ctx) {
                     return gateDelay;
                 }
                 script.setStatus("Exiting pasture gate");
-                ctx.walkToSmart(3250, 3267);
+                ctx.walkToSmart(3247, 3267);
                 return ctx.randomDelay(1000, 1400);
             }
         }
